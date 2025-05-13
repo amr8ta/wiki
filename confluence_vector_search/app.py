@@ -1,26 +1,25 @@
-from flask import Flask, render_template, request
+import streamlit as st
 from indexer import build_index, get_embedding
 import numpy as np
 
-app = Flask(__name__)
-index, chunks, metadata = build_index()
+st.set_page_config(page_title="Confluence Semantic Search", layout="wide")
+st.title("🔍 Confluence Semantic Search (BERT + FAISS)")
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    results = []
-    if request.method == "POST":
-        query = request.form["query"]
-        query_vec = get_embedding(query).astype("float32").reshape(1, -1)
-        distances, indices = index.search(query_vec, 5)
+@st.cache_resource(show_spinner="Building index...")
+def load_data():
+    return build_index()
 
-        for idx in indices[0]:
-            results.append({
-                "title": metadata[idx]["title"],
-                "url": metadata[idx]["url"],
-                "text": chunks[idx]
-            })
+index, chunks, metadata = load_data()
 
-    return render_template("index.html", results=results)
+query = st.text_input("Enter your search query:")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if query:
+    query_vec = get_embedding(query).astype("float32").reshape(1, -1)
+    distances, indices = index.search(query_vec, 5)
+
+    st.write(f"### Top {len(indices[0])} results:")
+
+    for i in indices[0]:
+        st.markdown(f"#### [{metadata[i]['title']}]({metadata[i]['url']})")
+        st.write(chunks[i])
+        st.markdown("---")

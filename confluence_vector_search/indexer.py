@@ -1,11 +1,8 @@
-"""
-Handles extraction, embedding, and FAISS
-"""
 import requests
 from bs4 import BeautifulSoup
-import numpy as np
 from transformers import AutoTokenizer, AutoModel
 import torch
+import numpy as np
 import faiss
 from config import *
 
@@ -45,22 +42,23 @@ def fetch_pages():
     return pages
 
 def build_index():
-    print("Fetching Confluence pages...")
     pages = fetch_pages()
-    texts, meta = [], []
+    chunks = []
+    metadata = []
 
     for page in pages:
         title = page["title"]
         pid = page["id"]
         url = f"{CONFLUENCE_BASE_URL}/pages/viewpage.action?pageId={pid}"
-        content = clean_html(page["body"]["storage"]["value"])
-        for i, chunk in enumerate(chunk_text(content)):
-            texts.append(chunk)
-            meta.append({"title": title, "url": url, "chunk_id": i})
+        html = page["body"]["storage"]["value"]
+        text = clean_html(html)
 
-    print(f"Embedding {len(texts)} chunks...")
-    vectors = np.array([get_embedding(t) for t in texts]).astype("float32")
+        for i, chunk in enumerate(chunk_text(text)):
+            chunks.append(chunk)
+            metadata.append({"title": title, "url": url, "chunk_id": i})
 
-    index = faiss.IndexFlatL2(vectors.shape[1])
-    index.add(vectors)
-    return index, texts, meta
+    embeddings = np.array([get_embedding(c) for c in chunks]).astype("float32")
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index.add(embeddings)
+
+    return index, chunks, metadata
